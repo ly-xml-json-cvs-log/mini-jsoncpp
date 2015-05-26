@@ -8,13 +8,7 @@
 #ifndef READER_H_INCLUDE_MINI_JSONCPP_
 #define READER_H_INCLUDE_MINI_JSONCPP_
 
-#include "features.h"
 #include "value.h"
-#include <deque>
-#include <iosfwd>
-#include <stack>
-#include <string>
-#include <istream>
 
 namespace Json {
 
@@ -23,7 +17,7 @@ namespace Json {
  *
  * \deprecated Use CharReader and CharReaderBuilder.
  */
-class JSON_API Reader {
+class Reader {
 public:
 	typedef char Char;
 	typedef const Char* Location;
@@ -43,12 +37,7 @@ public:
 	/** \brief Constructs a Reader allowing all features
 	 * for parsing.
 	 */
-	Reader();
-
-	/** \brief Constructs a Reader allowing the specified feature set
-	 * for parsing.
-	 */
-	Reader(const Features& features);
+	Reader(int debug = 0);
 
 	/** \brief Read a Value from a <a HREF="http://www.json.org">JSON</a>
 	 * document.
@@ -65,8 +54,7 @@ public:
 	 * error occurred.
 	 */
 	bool
-	parse(const std::string& document, Value& root,
-			bool collectComments = true);
+	parse(const std::string& document, Value& root);
 
 	/** \brief Read a Value from a <a HREF="http://www.json.org">JSON</a>
 	 document.
@@ -86,24 +74,7 @@ public:
 	 * \return \c true if the document was successfully parsed, \c false if an
 	 error occurred.
 	 */
-	bool parse(const char* beginDoc, const char* endDoc, Value& root,
-			bool collectComments = true);
-
-	/// \brief Parse from input stream.
-	/// \see Json::operator>>(std::istream&, Json::Value&).
-	bool parse(std::istream& is, Value& root, bool collectComments = true);
-
-	/** \brief Returns a user friendly string that list errors in the parsed
-	 * document.
-	 * \return Formatted error message with the list of errors with their location
-	 * in
-	 *         the parsed document. An empty string is returned if no error
-	 * occurred
-	 *         during parsing.
-	 * \deprecated Use getFormattedErrorMessages() instead (typo fix).
-	 */
-	JSONCPP_DEPRECATED("Use getFormattedErrorMessages() instead.")
-	std::string getFormatedErrorMessages() const;
+	bool parse(const char* beginDoc, const char* endDoc, Value& root);
 
 	/** \brief Returns a user friendly string that list errors in the parsed
 	 * document.
@@ -171,6 +142,9 @@ private:
 		TokenType type_;
 		Location start_;
 		Location end_;
+		Token() :
+				type_(tokenEndOfStream), start_(NULL), end_(NULL) {
+		}
 	};
 
 	class ErrorInfo {
@@ -185,9 +159,6 @@ private:
 	bool readToken(Token& token);
 	void skipSpaces();
 	bool match(Location pattern, int patternLength);
-	bool readComment();
-	bool readCStyleComment();
-	bool readCppStyleComment();
 	bool readString();
 	void readNumber();
 	bool readValue();
@@ -213,8 +184,6 @@ private:
 	void
 	getLocationLineAndColumn(Location location, int& line, int& column) const;
 	std::string getLocationLineAndColumn(Location location) const;
-	void addComment(Location begin, Location end, CommentPlacement placement);
-	void skipCommentTokens(Token& token);
 
 	typedef std::stack<Value*> Nodes;
 	Nodes nodes_;
@@ -225,163 +194,10 @@ private:
 	Location current_;
 	Location lastValueEnd_;
 	Value* lastValue_;
-	std::string commentsBefore_;
-	Features features_;
-	bool collectComments_;
+	int debug;
 };
 // Reader
 
-/** Interface for reading JSON from a char array.
- */
-class JSON_API CharReader {
-public:
-	virtual ~CharReader() {
-	}
-	/** \brief Read a Value from a <a HREF="http://www.json.org">JSON</a>
-	 document.
-	 * The document must be a UTF-8 encoded string containing the document to read.
-	 *
-	 * \param beginDoc Pointer on the beginning of the UTF-8 encoded string of the
-	 document to read.
-	 * \param endDoc Pointer on the end of the UTF-8 encoded string of the
-	 document to read.
-	 *        Must be >= beginDoc.
-	 * \param root [out] Contains the root value of the document if it was
-	 *             successfully parsed.
-	 * \param errs [out] Formatted error messages (if not NULL)
-	 *        a user friendly string that lists errors in the parsed
-	 * document.
-	 * \return \c true if the document was successfully parsed, \c false if an
-	 error occurred.
-	 */
-	virtual bool parse(char const* beginDoc, char const* endDoc, Value* root,
-			std::string* errs) = 0;
-
-	class Factory {
-	public:
-		virtual ~Factory() {
-		}
-		/** \brief Allocate a CharReader via operator new().
-		 * \throw std::exception if something goes wrong (e.g. invalid settings)
-		 */
-		virtual CharReader* newCharReader() const = 0;
-	};
-	// Factory
-};
-// CharReader
-
-/** \brief Build a CharReader implementation.
-
- Usage:
- \code
- using namespace Json;
- CharReaderBuilder builder;
- builder["collectComments"] = false;
- Value value;
- std::string errs;
- bool ok = parseFromStream(builder, std::cin, &value, &errs);
- \endcode
- */
-class JSON_API CharReaderBuilder: public CharReader::Factory {
-public:
-	// Note: We use a Json::Value so that we can add data-members to this class
-	// without a major version bump.
-	/** Configuration of this builder.
-	 These are case-sensitive.
-	 Available settings (case-sensitive):
-	 - `"collectComments": false or true`
-	 - true to collect comment and allow writing them
-	 back during serialization, false to discard comments.
-	 This parameter is ignored if allowComments is false.
-	 - `"allowComments": false or true`
-	 - true if comments are allowed.
-	 - `"strictRoot": false or true`
-	 - true if root must be either an array or an object value
-	 - `"allowDroppedNullPlaceholders": false or true`
-	 - true if dropped null placeholders are allowed. (See StreamWriterBuilder.)
-	 - `"allowNumericKeys": false or true`
-	 - true if numeric object keys are allowed.
-	 - `"allowSingleQuotes": false or true`
-	 - true if '' are allowed for strings (both keys and values)
-	 - `"stackLimit": integer`
-	 - Exceeding stackLimit (recursive depth of `readValue()`) will
-	 cause an exception.
-	 - This is a security issue (seg-faults caused by deeply nested JSON),
-	 so the default is low.
-	 - `"failIfExtra": false or true`
-	 - If true, `parse()` returns false when extra non-whitespace trails
-	 the JSON value in the input string.
-	 - `"rejectDupKeys": false or true`
-	 - If true, `parse()` returns false when a key is duplicated within an object.
-
-	 You can examine 'settings_` yourself
-	 to see the defaults. You can also write and read them just like any
-	 JSON Value.
-	 \sa setDefaults()
-	 */
-	Json::Value settings_;
-
-	CharReaderBuilder();
-	virtual ~CharReaderBuilder();
-
-	virtual CharReader* newCharReader() const;
-
-	/** \return true if 'settings' are legal and consistent;
-	 *   otherwise, indicate bad settings via 'invalid'.
-	 */
-	bool validate(Json::Value* invalid) const;
-
-	/** A simple way to update a specific setting.
-	 */
-	Value& operator[](std::string key);
-
-	/** Called by ctor, but you can use this to reset settings_.
-	 * \pre 'settings' != NULL (but Json::null is fine)
-	 * \remark Defaults:
-	 * \snippet src/lib_json/json_reader.cpp CharReaderBuilderDefaults
-	 */
-	static void setDefaults(Json::Value* settings);
-	/** Same as old Features::strictMode().
-	 * \pre 'settings' != NULL (but Json::null is fine)
-	 * \remark Defaults:
-	 * \snippet src/lib_json/json_reader.cpp CharReaderBuilderStrictMode
-	 */
-	static void strictMode(Json::Value* settings);
-};
-
-/** Consume entire stream and use its begin/end.
- * Someday we might have a real StreamReader, but for now this
- * is convenient.
- */
-bool JSON_API parseFromStream(CharReader::Factory const&, std::istream&,
-		Value* root, std::string* errs);
-
-/** \brief Read from 'sin' into 'root'.
-
- Always keep comments from the input JSON.
-
- This can be used to read a file into a particular sub-object.
- For example:
- \code
- Json::Value root;
- cin >> root["dir"]["file"];
- cout << root;
- \endcode
- Result:
- \verbatim
- {
- "dir": {
- "file": {
- // The input stream JSON would be nested here.
- }
- }
- }
- \endverbatim
- \throw std::exception on parse error.
- \see Json::operator<<()
- */
-JSON_API std::istream& operator>>(std::istream&, Value&);
-
-} // namespace Json
+}// namespace Json
 
 #endif /* READER_H_INCLUDE_MINI_JSONCPP_ */

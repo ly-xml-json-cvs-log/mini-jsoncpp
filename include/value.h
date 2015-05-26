@@ -9,6 +9,7 @@
 #define VALUE_H_INCLUDE_MINI_JSONCPP_
 
 #include "config.h"
+#include "tools.h"
 
 namespace Json {
 
@@ -19,6 +20,8 @@ enum ValueType {
 	nullValue = 0, ///< 'null' value
 	intValue,      ///< signed integer value
 	uintValue,     ///< unsigned integer value
+	//int64Value,      ///< signed integer64 value
+	//uint64Value,     ///< unsigned integer64 value
 	realValue,     ///< double value
 	stringValue,   ///< UTF-8 string value
 	booleanValue,  ///< bool value
@@ -60,8 +63,6 @@ class Value {
 	friend class ValueIteratorBase;
 public:
 	typedef std::vector<std::string> Members;
-	typedef ValueIterator iterator;
-	typedef ValueConstIterator const_iterator;
 	typedef Json::UInt UInt;
 	typedef Json::Int Int;
 	typedef Json::UInt64 UInt64;
@@ -70,6 +71,8 @@ public:
 	typedef Json::LargestUInt LargestUInt;
 	typedef Json::ArrayIndex ArrayIndex;
 	typedef std::map<string, Value> ObjectValues;
+	typedef std::vector<Value> ArrayValues;
+	typedef std::string StringValues;
 
 public:
 	///< We regret this reference to a global instance; prefer the simpler Value().
@@ -122,20 +125,22 @@ public:
 	Value(const char* value);
 	Value(const std::string& value);
 	Value(bool value);
+
+	Value& assignment(Value const& other);
 	Value(const Value& other);
+
+	void destructor();
 	~Value();
 
 	/*
 	 *  Deep copy, then swap(other).
 	 */
-	Value& operator=(Value other);
+	Value& operator=(const Value& other);
 
 	/*
 	 * Swap everything.
 	 */
 	void swap(Value& other);
-	/// Swap values but leave comments and source offsets in place.
-	void swapPayload(Value& other);
 
 	ValueType type() const;
 
@@ -147,11 +152,6 @@ public:
 	bool operator==(const Value& other) const;
 	bool operator!=(const Value& other) const;
 	int compare(const Value& other) const;
-
-	/*
-	 *  Embedded zeroes could cause you trouble!
-	 */
-	const char* asCString() const;
 
 	/*
 	 * Embedded zeroes are possible.
@@ -220,50 +220,38 @@ public:
 	const Value& operator[](ArrayIndex index) const;
 	const Value& operator[](int index) const;
 
-	/// If the array contains at least index+1 elements, returns the element
-	/// value,
-	/// otherwise returns defaultValue.
-	Value get(ArrayIndex index, const Value& defaultValue) const;
-	/// Return true if index < size().
-	bool isValidIndex(ArrayIndex index) const;
+	/// Most general and efficient version of isMember()const, get()const,
+	/// and operator[]const
+	/// \note As stated elsewhere, behavior is undefined if (end-key) >= 2^30
+	Value * find(const std::string& key);
+	const Value * find(const std::string& key) const;
+	Value * find(const char* key);
+	const Value * find(const char* key) const;
 
 	/// \brief Append value to array at the end.
 	/// Equivalent to jsonvalue[jsonvalue.size()] = value;
-	Value& append(const Value& value);
+	void append(const Value& value);
 
 	/// Access an object value by name, create a null member if it does not exist.
 	/// \note Because of our implementation, keys are limited to 2^30 -1 chars.
 	///  Exceeding that will cause an exception.
+	Value& operator[](const string& key);
 	Value& operator[](const char* key);
+	const Value& operator[](const string& key) const;
 	const Value& operator[](const char* key) const;
-	Value& operator[](const std::string& key);
-	const Value& operator[](const std::string& key) const;
-
-	/// Return the member named key if it exist, defaultValue otherwise.
-	/// \note deep copy
-	Value get(const char* key, const Value& defaultValue) const;
-	Value get(const std::string& key, const Value& defaultValue) const;
 
 	/// \brief Remove and return the named member.
 	///
 	/// Do nothing if it did not exist.
 	/// \return the removed Value, or null.
-	Value removeMember(const char* key);
-	Value removeMember(const std::string& key);
-
-	/*
-	 * brief Remove the named map member.
-	 */
-	bool removeMember(std::string const& key, Value* removed);
-	bool removeMember(const char* key, Value* removed);
+	void removeMember(const std::string& key);
 
 	/*
 	 * \brief Remove the indexed array element.
 	 */
-	bool removeIndex(ArrayIndex i, Value* removed);
+	void removeIndex(ArrayIndex i);
 
 	/// Return true if the object has a member named key.
-	bool isMember(const char* key) const;
 	bool isMember(const std::string& key) const;
 
 	/// \brief Return a list of the member names.
@@ -272,268 +260,34 @@ public:
 
 	std::string toStyledString() const;
 
-	const_iterator begin() const;
-	const_iterator end() const;
-
-	iterator begin();
-	iterator end();
-
+	// Accessors for the [start, limit) range of bytes within the JSON text from
+	// which this value was parsed, if any.
+	void setOffsetStart(size_t start);
+	void setOffsetLimit(size_t limit);
+	size_t getOffsetStart() const;
+	size_t getOffsetLimit() const;
 private:
-	void initBasic(ValueType type, bool allocated = false);
-
-	Value& resolveReference(const char* key);
-	Value& resolveReference(const char* key, const char* end);
+	void initBasic(ValueType type);
+	StringValues*getStringVaule();
+	ObjectValues* getObjectVaule();
+	ArrayValues* getArrayVaule();
+	void transformType(ValueType newType);
 
 	union ValueHolder {
 		LargestInt int_;
 		LargestUInt uint_;
 		double real_;
 		bool bool_;
-		char* string_; // actually ptr to unsigned, followed by str, unless !allocated_
+		StringValues* string_;
 		ObjectValues* map_;
+		ArrayValues* array_;
 	} value_;
-	ValueType type_ :8;
+	ValueType type_;
 
-	/*
-	 *Notes: if declared as bool, bitfield is useless.
-	 *If not allocated_, string_ must be null-terminated.
-	 */
-	unsigned int allocated_ :1;
-};
-
-/** \brief Experimental and untested: represents an element of the "path" to
- * access a node.
- */
-class PathArgument {
-public:
-	friend class Path;
-
-	PathArgument();
-	PathArgument(ArrayIndex index);
-	PathArgument(const char* key);
-	PathArgument(const std::string& key);
-
-private:
-	enum Kind {
-		kindNone = 0, kindIndex, kindKey
-	};
-	std::string key_;
-	ArrayIndex index_;
-	Kind kind_;
-};
-
-/** \brief Experimental and untested: represents a "path" to access a node.
- *
- * Syntax:
- * - "." => root node
- * - ".[n]" => elements at index 'n' of root node (an array value)
- * - ".name" => member named 'name' of root node (an object value)
- * - ".name1.name2.name3"
- * - ".[0][1][2].name1[3]"
- * - ".%" => member name is provided as parameter
- * - ".[%]" => index is provied as parameter
- */
-class Path {
-public:
-	Path(const std::string& path, const PathArgument& a1 = PathArgument(),
-			const PathArgument& a2 = PathArgument(), const PathArgument& a3 =
-					PathArgument(), const PathArgument& a4 = PathArgument(),
-			const PathArgument& a5 = PathArgument());
-
-			const Value& resolve(const Value& root) const;
-	Value resolve(const Value& root, const Value& defaultValue) const;
-	/// Creates the "path" to access the specified node and returns a reference on
-	/// the node.
-	Value& make(Value& root) const;
-
-private:
-	typedef std::vector<const PathArgument*> InArgs;
-	typedef std::vector<PathArgument> Args;
-
-	void makePath(const std::string& path, const InArgs& in);
-	void addPathInArg(const std::string& path, const InArgs& in,
-			InArgs::const_iterator& itInArg, PathArgument::Kind kind);
-	void invalidPath(const std::string& path, int location);
-
-	Args args_;
-};
-
-/** \brief base class for Value iterators.
- *
- */
-class ValueIteratorBase {
-public:
-	typedef std::bidirectional_iterator_tag iterator_category;
-	typedef unsigned int size_t;
-	typedef int difference_type;
-	typedef ValueIteratorBase SelfType;
-
-	bool operator==(const SelfType& other) const {
-		return isEqual(other);
-	}
-
-	bool operator!=(const SelfType& other) const {
-		return !isEqual(other);
-	}
-
-	difference_type operator-(const SelfType& other) const {
-		return other.computeDistance(*this);
-	}
-
-	/// Return either the index or the member name of the referenced value as a
-	/// Value.
-	Value key() const;
-
-	/// Return the index of the referenced Value, or -1 if it is not an arrayValue.
-	UInt index() const;
-
-	/// Return the member name of the referenced Value, or "" if it is not an
-	/// objectValue.
-	/// \note Avoid `c_str()` on result, as embedded zeroes are possible.
-	std::string name() const;
-
-	/// Return the member name of the referenced Value. "" if it is not an
-	/// objectValue.
-	/// \deprecated This cannot be used for UTF-8 strings, since there can be embedded nulls.
-	JSONCPP_DEPRECATED("Use `key = name();` instead.")
-	char const* memberName() const;
-/// Return the member name of the referenced Value, or NULL if it is not an
-/// objectValue.
-/// \note Better version than memberName(). Allows embedded nulls.
-	char const* memberName(char const** end) const;
-
-protected:
-	Value& deref() const;
-
-	void increment();
-
-	void decrement();
-
-	difference_type computeDistance(const SelfType& other) const;
-
-	bool isEqual(const SelfType& other) const;
-
-	void copy(const SelfType& other);
-
-private:
-	Value::ObjectValues::iterator current_;
-// Indicates that iterator is for a null value.
-	bool isNull_;
-
-public:
-// For some reason, BORLAND needs these at the end, rather
-// than earlier. No idea why.
-	ValueIteratorBase();
-	explicit ValueIteratorBase(const Value::ObjectValues::iterator& current);
-};
-
-/** \brief const iterator for object and array value.
- *
- */
-class ValueConstIterator: public ValueIteratorBase {
-	friend class Value;
-
-public:
-	typedef const Value value_type;
-	typedef unsigned int size_t;
-	typedef int difference_type;
-	typedef const Value& reference;
-	typedef const Value* pointer;
-	typedef ValueConstIterator SelfType;
-
-	ValueConstIterator();
-
-private:
-	/*! \internal Use by Value to create an iterator.
-	 */
-	explicit ValueConstIterator(const Value::ObjectValues::iterator& current);
-public:
-	SelfType& operator=(const ValueIteratorBase& other);
-
-	SelfType operator++(int) {
-		SelfType temp(*this);
-		++*this;
-		return temp;
-	}
-
-	SelfType operator--(int) {
-		SelfType temp(*this);
-		--*this;
-		return temp;
-	}
-
-	SelfType& operator--() {
-		decrement();
-		return *this;
-	}
-
-	SelfType& operator++() {
-		increment();
-		return *this;
-	}
-
-	reference operator*() const {
-		return deref();
-	}
-
-	pointer operator->() const {
-		return &deref();
-	}
-};
-
-/** \brief Iterator for object and array value.
- */
-class ValueIterator: public ValueIteratorBase {
-	friend class Value;
-
-public:
-	typedef Value value_type;
-	typedef unsigned int size_t;
-	typedef int difference_type;
-	typedef Value& reference;
-	typedef Value* pointer;
-	typedef ValueIterator SelfType;
-
-	ValueIterator();
-	ValueIterator(const ValueConstIterator& other);
-	ValueIterator(const ValueIterator& other);
-
-private:
-	/*! \internal Use by Value to create an iterator.
-	 */
-	explicit ValueIterator(const Value::ObjectValues::iterator& current);
-public:
-	SelfType& operator=(const SelfType& other);
-
-	SelfType operator++(int) {
-		SelfType temp(*this);
-		++*this;
-		return temp;
-	}
-
-	SelfType operator--(int) {
-		SelfType temp(*this);
-		--*this;
-		return temp;
-	}
-
-	SelfType& operator--() {
-		decrement();
-		return *this;
-	}
-
-	SelfType& operator++() {
-		increment();
-		return *this;
-	}
-
-	reference operator*() const {
-		return deref();
-	}
-
-	pointer operator->() const {
-		return &deref();
-	}
+	// [start, limit) byte offsets in the source JSON text from which this Value
+	// was extracted.
+	size_t start_;
+	size_t limit_;
 };
 
 }

@@ -9,16 +9,23 @@
 #define CONFIG_H_INCLUDE_MINI_JSONCPP_
 
 #include <stdlib.h>
+#include <cstdio>
+#include <iosfwd>
+#include <istream>
 #include <sstream>
 #include <ostream>
 #include <string>
+#include <cstring>
 #include <vector>
 #include <map>
+#include <stack>
+#include <set>
+#include <deque>
 #include <math.h>
-#include <sstream>
 #include <utility>
-#include <cstring>
 #include <cassert>
+#include <iomanip>
+#include <memory>
 #include <cstddef> // size_t
 #include <algorithm>
 #include <functional>
@@ -42,8 +49,8 @@ using namespace std;
  * The call to assert() will show the failure message in debug builds.
  * In release builds we abort, for a core-dump or debugger.
  */
-# define JSON_FAIL_MESSAGE(message)  {  std::ostringstream oss; oss << message;   assert(false && oss.str().c_str()); abort();     }
-#define JSON_ASSERT_MESSAGE(condition, message)    {  if (!(condition)) {  JSON_FAIL_MESSAGE(message);   } }
+# define JSON_FAIL_MESSAGE(message)  do { std::ostringstream oss; oss << message;   assert(true && oss.str().c_str()); abort();} while (0)
+#define JSON_ASSERT_MESSAGE(condition, message)     do {  if (!(condition)) {  JSON_FAIL_MESSAGE(message);   }} while (0)
 
 namespace Json {
 typedef int Int;
@@ -52,7 +59,6 @@ typedef long long int Int64;
 typedef unsigned long long int UInt64;
 typedef Int64 LargestInt;
 typedef UInt64 LargestUInt;
-#define JSON_HAS_INT64
 
 // writer.h
 class FastWriter;
@@ -63,13 +69,7 @@ class Reader;
 
 // value.h
 typedef unsigned int ArrayIndex;
-class Path;
-class PathArgument;
-
 class Value;
-class ValueIteratorBase;
-class ValueIterator;
-class ValueConstIterator;
 
 } // end namespace Json
 
