@@ -106,14 +106,14 @@ public:
 	 * brief Create a default Value of the given type.
 	 *  This is a very useful constructor.
 	 *  To create an empty array, pass arrayValue.
-	 *   To create an empty object, pass objectValue.
-	 *    Another Value can then be set to this one by assignment.
-	 *    This is useful since clear() and resize() will not alter types.
+	 *  To create an empty object, pass objectValue.
+	 *  Another Value can then be set to this one by assignment.
+	 *  This is useful since clear() and resize() will not alter types.
 	 *
-	 *     Examples:
-	 *      Json::Value null_value; // null
-	 *       Json::Value arr_value(Json::arrayValue); // []
-	 *        Json::Value obj_value(Json::objectValue); // {}
+	 *  Examples:
+	 *    Json::Value null_value; // null
+	 *    Json::Value arr_value(Json::arrayValue); // []
+	 *    Json::Value obj_value(Json::objectValue); // {}
 	 */
 	Value(ValueType type = nullValue);
 	Value(Int value);
@@ -125,7 +125,6 @@ public:
 	Value(const std::string& value);
 	Value(bool value);
 
-	Value& assignment(Value const& other);
 	Value(const Value& other);
 
 	void destructor();
@@ -150,7 +149,6 @@ public:
 	bool operator>(const Value& other) const;
 	bool operator==(const Value& other) const;
 	bool operator!=(const Value& other) const;
-	int compare(const Value& other) const;
 
 	/*
 	 * Embedded zeroes are possible.
@@ -258,18 +256,15 @@ public:
 	Members getMemberNames() const;
 
 	std::string toStyledString() const;
-
-	// Accessors for the [start, limit) range of bytes within the JSON text from
-	// which this value was parsed, if any.
-	void setOffsetStart(std::size_t start);
-	void setOffsetLimit(std::size_t limit);
-	std::size_t getOffsetStart() const;
-	std::size_t getOffsetLimit() const;
 private:
 	void initBasic(ValueType type);
+
 	StringValues*getStringVaule();
 	ObjectValues* getObjectVaule();
 	ArrayValues* getArrayVaule();
+
+	int compare(const Value& other) const;
+	Value& assignment(Value const& other);
 	void transformType(ValueType newType);
 
 	union ValueHolder {
