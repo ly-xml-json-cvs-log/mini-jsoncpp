@@ -23,7 +23,7 @@ Reader::Reader(int debug) :
 bool Reader::parse(const std::string& document, Value& root) {
 	document_ = document;
 	if (debug) {
-		printf("document : %s\n", document.c_str());
+		LOG("document : %s", document.c_str());
 	}
 	const char* begin = document_.c_str();
 	const char* end = begin + document_.length();
@@ -49,6 +49,8 @@ bool Reader::parse(const char* beginDoc, const char* endDoc, Value& root) {
 	Token token;
 
 	if (successful && !root.isArray() && !root.isObject()) {
+		LOG(
+				"A valid JSON document must be either an array or an object value.");
 		// Set error location to start of doc, ideally should be first token found
 		// in doc
 		token.type_ = tokenError;
@@ -69,24 +71,13 @@ bool Reader::readValue() {
 
 	readToken(token);
 
-	if (debug) {
-		printf("%d %s   readToken : token=%d current_=%p\n", __LINE__,
-				__FUNCTION__, token.type_, current_);
-	}
-
 	switch (token.type_) {
 	case tokenObjectBegin: {
-		if (debug) {
-			printf("%d %s   tokenObjectBegin :current_=%p\n", __LINE__,
-					__FUNCTION__, current_);
-		}
-
 		successful = readObject(token);
 		break;
 	}
 	case tokenArrayBegin: {
 		successful = readArray(token);
-		currentValue().setOffsetLimit(current_ - begin_);
 		break;
 	}
 	case tokenNumber: {
@@ -100,22 +91,16 @@ bool Reader::readValue() {
 	case tokenTrue: {
 		Value v(true);
 		currentValue().swap(v);
-		currentValue().setOffsetStart(token.start_ - begin_);
-		currentValue().setOffsetLimit(token.end_ - begin_);
 		break;
 	}
 	case tokenFalse: {
 		Value v(false);
 		currentValue().swap(v);
-		currentValue().setOffsetStart(token.start_ - begin_);
-		currentValue().setOffsetLimit(token.end_ - begin_);
 		break;
 	}
 	case tokenNull: {
 		Value v;
 		currentValue().swap(v);
-		currentValue().setOffsetStart(token.start_ - begin_);
-		currentValue().setOffsetLimit(token.end_ - begin_);
 		break;
 	}
 	case tokenArraySeparator:
@@ -126,13 +111,9 @@ bool Reader::readValue() {
 		current_--;
 		Value v;
 		currentValue().swap(v);
-		currentValue().setOffsetStart(current_ - begin_ - 1);
-		currentValue().setOffsetLimit(current_ - begin_);
 		break;
 	}
 	default: {
-		currentValue().setOffsetStart(token.start_ - begin_);
-		currentValue().setOffsetLimit(token.end_ - begin_);
 		return addError("Syntax error: value, object or array expected.", token);
 	}
 	}
@@ -143,19 +124,9 @@ bool Reader::readValue() {
 bool Reader::readToken(Token& token) {
 	skipSpaces();
 
-	if (debug) {
-		printf("%d %s   begin  current_=%p\n", __LINE__, __FUNCTION__,
-				current_);
-	}
-
 	token.start_ = current_;
 	Char c = getNextChar();
 	bool ok = true;
-
-	if (debug) {
-		printf("%d %s   read=%c current_=%p\n", __LINE__, __FUNCTION__, c,
-				current_);
-	}
 
 	switch (c) {
 	case '{':
@@ -216,10 +187,6 @@ bool Reader::readToken(Token& token) {
 	if (!ok) {
 		token.type_ = tokenError;
 	}
-	if (debug) {
-		printf("%d %s   token=%d current_=%p\n", __LINE__, __FUNCTION__,
-				token.type_, current_);
-	}
 
 	token.end_ = current_;
 	return true;
@@ -228,10 +195,11 @@ bool Reader::readToken(Token& token) {
 void Reader::skipSpaces() {
 	while (current_ != end_) {
 		Char c = *current_;
-		if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+		if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
 			++current_;
-		else
+		} else {
 			break;
+		}
 	}
 }
 
@@ -293,22 +261,15 @@ bool Reader::readString() {
 }
 
 bool Reader::readObject(Token& tokenStart) {
-	if (debug) {
-		printf("%d %s   begin :current_=%p\n", __LINE__, __FUNCTION__,
-				current_);
-	}
 
 	Token tokenName;
 	std::string name = "";
 	Value init(objectValue);
 	currentValue().swap(init);
+
 	while (readToken(tokenName)) {
 		// empty object
 		if (tokenName.type_ == tokenObjectEnd && name.empty()) {
-			if (debug) {
-				printf("%d %s   object empty  :current_=%p\n", __LINE__,
-						__FUNCTION__, current_);
-			}
 			return true;
 		}
 
@@ -335,8 +296,9 @@ bool Reader::readObject(Token& tokenStart) {
 		nodes_.push(&value);
 		bool ok = readValue();
 		nodes_.pop();
-		if (!ok) // error already set
+		if (!ok) {		// error already set
 			return recoverFromError(tokenObjectEnd);
+		}
 
 		Token comma;
 		if (!readToken(comma)
@@ -360,10 +322,9 @@ bool Reader::readObject(Token& tokenStart) {
 bool Reader::readArray(Token& tokenStart) {
 	Value init(arrayValue);
 	currentValue().swap(init);
-	currentValue().setOffsetStart(tokenStart.start_ - begin_);
 	skipSpaces();
-	if (*current_ == ']') // empty array
-			{
+
+	if (*current_ == ']') {		// empty array
 		Token endArray;
 		readToken(endArray);
 		return true;
@@ -402,8 +363,6 @@ bool Reader::decodeNumber(Token& token) {
 	}
 
 	currentValue().swap(decoded);
-	currentValue().setOffsetStart(token.start_ - begin_);
-	currentValue().setOffsetLimit(token.end_ - begin_);
 	return true;
 }
 
@@ -455,8 +414,6 @@ bool Reader::decodeDouble(Token& token) {
 		return false;
 	}
 	currentValue().swap(decoded);
-	currentValue().setOffsetStart(token.start_ - begin_);
-	currentValue().setOffsetLimit(token.end_ - begin_);
 	return true;
 }
 
@@ -505,15 +462,13 @@ bool Reader::decodeString(Token& token) {
 
 	Value decoded(decoded_string);
 	currentValue().swap(decoded);
-	currentValue().setOffsetStart(token.start_ - begin_);
-	currentValue().setOffsetLimit(token.end_ - begin_);
 	return true;
 }
 
 bool Reader::decodeString(Token& token, std::string& decoded) {
 	decoded.reserve(token.end_ - token.start_ - 2);
 	Location current = token.start_ + 1; // skip '"'
-	Location end = token.end_ - 1;       // do not include '"'
+	Location end = token.end_ - 1; // do not include '"'
 	while (current != end) {
 		Char c = *current++;
 		if (c == '"') {
@@ -628,7 +583,6 @@ bool Reader::addError(const std::string& message, Token& token,
 	ErrorInfo info;
 	info.token_ = token;
 	info.message_ = message;
-	info.extra_ = extra;
 	errors_.push_back(info);
 	return false;
 }
@@ -704,61 +658,40 @@ std::string Reader::getFormattedErrorMessages() const {
 		formattedMessage += "* " + getLocationLineAndColumn(error.token_.start_)
 				+ "\n";
 		formattedMessage += "  " + error.message_ + "\n";
-		if (error.extra_) {
-			formattedMessage += "See " + getLocationLineAndColumn(error.extra_)
-					+ " for detail.\n";
-		}
 	}
 	return formattedMessage;
 }
 
-std::vector<Reader::StructuredError> Reader::getStructuredErrors() const {
-	std::vector<Reader::StructuredError> allErrors;
+std::vector<std::string> Reader::getStructuredErrors() const {
+	std::vector<std::string> allErrors;
 	for (Errors::const_iterator itError = errors_.begin();
 			itError != errors_.end(); ++itError) {
-		const ErrorInfo& error = *itError;
-		Reader::StructuredError structured;
-		structured.offset_start = error.token_.start_ - begin_;
-		structured.offset_limit = error.token_.end_ - begin_;
-		structured.message = error.message_;
-		allErrors.push_back(structured);
+		allErrors.push_back(itError->message_);
 	}
 	return allErrors;
 }
 
 bool Reader::pushError(const Value& value, const std::string& message) {
-	size_t length = end_ - begin_;
-	if (value.getOffsetStart() > length || value.getOffsetLimit() > length) {
-		return false;
-	}
 	Token token;
 	token.type_ = tokenError;
-	token.start_ = begin_ + value.getOffsetStart();
-	token.end_ = end_ + value.getOffsetLimit();
+	token.start_ = begin_;
+	token.end_ = end_;
 	ErrorInfo info;
 	info.token_ = token;
 	info.message_ = message;
-	info.extra_ = 0;
 	errors_.push_back(info);
 	return true;
 }
 
 bool Reader::pushError(const Value& value, const std::string& message,
 		const Value& extra) {
-	size_t length = end_ - begin_;
-	if (value.getOffsetStart() > length || value.getOffsetLimit() > length
-			|| extra.getOffsetLimit() > length) {
-		return false;
-	}
-
 	Token token;
 	token.type_ = tokenError;
-	token.start_ = begin_ + value.getOffsetStart();
-	token.end_ = begin_ + value.getOffsetLimit();
+	token.start_ = begin_;
+	token.end_ = begin_;
 	ErrorInfo info;
 	info.token_ = token;
 	info.message_ = message;
-	info.extra_ = begin_ + extra.getOffsetStart();
 	errors_.push_back(info);
 	return true;
 }

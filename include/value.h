@@ -60,7 +60,6 @@ enum ValueType {
  * That is the responsibility of the caller.
  */
 class Value {
-	friend class ValueIteratorBase;
 public:
 	typedef std::vector<std::string> Members;
 	typedef Json::UInt UInt;
@@ -262,10 +261,10 @@ public:
 
 	// Accessors for the [start, limit) range of bytes within the JSON text from
 	// which this value was parsed, if any.
-	void setOffsetStart(size_t start);
-	void setOffsetLimit(size_t limit);
-	size_t getOffsetStart() const;
-	size_t getOffsetLimit() const;
+	void setOffsetStart(std::size_t start);
+	void setOffsetLimit(std::size_t limit);
+	std::size_t getOffsetStart() const;
+	std::size_t getOffsetLimit() const;
 private:
 	void initBasic(ValueType type);
 	StringValues*getStringVaule();
@@ -284,10 +283,6 @@ private:
 	} value_;
 	ValueType type_;
 
-	// [start, limit) byte offsets in the source JSON text from which this Value
-	// was extracted.
-	size_t start_;
-	size_t limit_;
 };
 
 }

@@ -26,6 +26,7 @@
 #include <cassert>
 #include <iomanip>
 #include <memory>
+#include <stddef.h> // size_t
 #include <cstddef> // size_t
 #include <algorithm>
 #include <functional>
@@ -37,6 +38,10 @@ using namespace std;
 #define JSONCPP_DEPRECATED(message)  __attribute__((__deprecated__))
 #else
 #define JSONCPP_DEPRECATED(message)
+#endif
+
+#ifndef LOG
+#define LOG(X, Y...) do  { printf("%s:%s:%d" X "\n",__FILE__, __FUNCTION__, __LINE__, ##Y); } while(0)
 #endif
 
 /*

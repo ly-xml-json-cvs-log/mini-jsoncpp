@@ -132,13 +132,13 @@ void Value::initBasic(ValueType type) {
 }
 
 Value::StringValues* Value::getStringVaule() {
-	return (value_.string_);
+	return (Value::StringValues*) (value_.string_);
 }
 Value::ObjectValues* Value::getObjectVaule() {
-	return (value_.map_);
+	return (Value::ObjectValues*) (value_.map_);
 }
 Value::ArrayValues* Value::getArrayVaule() {
-	return (value_.array_);
+	return (Value::ArrayValues*) (value_.array_);
 }
 
 void Value::transformType(ValueType newType) {
@@ -258,9 +258,8 @@ Value::~Value() {
 }
 
 void Value::swap(Value& other) {
-	ValueType tmpType = type_;
-	type_ = other.type_;
-	other.type_ = tmpType;
+	std::swap(type_, other.type_);
+	std::swap(value_, other.value_);
 }
 
 Value& Value::operator=(const Value& other) {
@@ -708,10 +707,14 @@ void Value::clear() {
 
 void Value::resize(ArrayIndex newSize) {
 	transformType(arrayValue);
-	value_.array_->resize(newSize);
+	getArrayVaule()->resize(newSize);
 }
 
 Value& Value::operator[](ArrayIndex index) {
+	transformType(arrayValue);
+	if (index >= size()) {
+		resize(index + 1);
+	}
 	return value_.array_->at(int(index));
 }
 Value& Value::operator[](int index) {
@@ -726,7 +729,8 @@ const Value& Value::operator[](int index) const {
 }
 
 void Value::append(const Value& value) {
-	(*this)[size()] = value;
+	transformType(arrayValue);
+	getArrayVaule()->push_back(value);
 }
 
 void Value::removeIndex(ArrayIndex index) {
@@ -807,11 +811,6 @@ Value::Members Value::getMemberNames() const {
 	if (type_ != objectValue) {
 		return members;
 	}
-
-	printf("%d %s   map=%p\n", __LINE__, __FUNCTION__, value_.map_);
-
-	printf("%d %s   map=%p size=%d\n", __LINE__, __FUNCTION__, value_.map_,
-			(int) value_.map_->size());
 	int size = value_.map_->size();
 	for (map<string, Value>::iterator it = value_.map_->begin();
 			it != value_.map_->end() && size; it++, size--) {
@@ -824,22 +823,6 @@ Value::Members Value::getMemberNames() const {
 std::string Value::toStyledString() const {
 	FastWriter writer;
 	return writer.write(*this);
-}
-
-void Value::setOffsetStart(size_t start) {
-	start_ = start;
-}
-
-void Value::setOffsetLimit(size_t limit) {
-	limit_ = limit;
-}
-
-size_t Value::getOffsetStart() const {
-	return start_;
-}
-
-size_t Value::getOffsetLimit() const {
-	return limit_;
 }
 
 } // namespace Json
