@@ -14,7 +14,7 @@ LIB = -lz -lrt -lpthread
 SOURCE = $(wildcard *.cpp)
 OBJS    = $(patsubst %.cpp,%.o,$(SOURCE))
 
-OUTPUT  := ../lib/libmini-jsoncpp.a
+OUTPUT  := ../lib/libmini_jsoncpp.a
 
 all: $(OUTPUT)
 
