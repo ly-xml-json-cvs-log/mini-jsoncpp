@@ -73,11 +73,11 @@ bool Reader::readValue() {
 
 	switch (token.type_) {
 	case tokenObjectBegin: {
-		successful = readObject(token);
+		successful = readObject();
 		break;
 	}
 	case tokenArrayBegin: {
-		successful = readArray(token);
+		successful = readArray();
 		break;
 	}
 	case tokenNumber: {
@@ -260,7 +260,7 @@ bool Reader::readString() {
 	return c == '"';
 }
 
-bool Reader::readObject(Token& tokenStart) {
+bool Reader::readObject() {
 
 	Token tokenName;
 	std::string name = "";
@@ -319,7 +319,7 @@ bool Reader::readObject(Token& tokenStart) {
 			tokenObjectEnd);
 }
 
-bool Reader::readArray(Token& tokenStart) {
+bool Reader::readArray() {
 	Value init(arrayValue);
 	currentValue().swap(init);
 	skipSpaces();
@@ -475,8 +475,7 @@ bool Reader::decodeString(Token& token, std::string& decoded) {
 			break;
 		} else if (c == '\\') {
 			if (current == end) {
-				return addError("Empty escape sequence in string", token,
-						current);
+				return addError("Empty escape sequence in string", token);
 			}
 			Char escape = *current++;
 			switch (escape) {
@@ -512,7 +511,7 @@ bool Reader::decodeString(Token& token, std::string& decoded) {
 				decoded += codePointToUTF8(unicode);
 				break;
 			default:
-				return addError("Bad escape sequence in string", token, current);
+				return addError("Bad escape sequence in string", token);
 			}
 		} else {
 			decoded += c;
@@ -532,7 +531,7 @@ bool Reader::decodeUnicodeCodePoint(Token& token, Location& current,
 		if (end - current < 6) {
 			return addError(
 					"additional six characters expected to parse unicode surrogate pair.",
-					token, current);
+					token);
 		}
 		unsigned int surrogatePair;
 		if (*(current++) == '\\' && *(current++) == 'u') {
@@ -546,7 +545,7 @@ bool Reader::decodeUnicodeCodePoint(Token& token, Location& current,
 		} else {
 			return addError(
 					"expecting another \\u token to begin the second half of "
-							"a unicode surrogate pair", token, current);
+							"a unicode surrogate pair", token);
 		}
 	}
 	return true;
@@ -557,7 +556,7 @@ bool Reader::decodeUnicodeEscapeSequence(Token& token, Location& current,
 	if (end - current < 4) {
 		return addError(
 				"Bad unicode escape sequence in string: four digits expected.",
-				token, current);
+				token);
 	}
 	unicode = 0;
 	for (int index = 0; index < 4; ++index) {
@@ -572,14 +571,13 @@ bool Reader::decodeUnicodeEscapeSequence(Token& token, Location& current,
 		} else {
 			return addError(
 					"Bad unicode escape sequence in string: hexadecimal digit expected.",
-					token, current);
+					token);
 		}
 	}
 	return true;
 }
 
-bool Reader::addError(const std::string& message, Token& token,
-		Location extra) {
+bool Reader::addError(const std::string& message, Token& token) {
 	ErrorInfo info;
 	info.token_ = token;
 	info.message_ = message;
@@ -669,31 +667,6 @@ std::vector<std::string> Reader::getStructuredErrors() const {
 		allErrors.push_back(itError->message_);
 	}
 	return allErrors;
-}
-
-bool Reader::pushError(const Value& value, const std::string& message) {
-	Token token;
-	token.type_ = tokenError;
-	token.start_ = begin_;
-	token.end_ = end_;
-	ErrorInfo info;
-	info.token_ = token;
-	info.message_ = message;
-	errors_.push_back(info);
-	return true;
-}
-
-bool Reader::pushError(const Value& value, const std::string& message,
-		const Value& extra) {
-	Token token;
-	token.type_ = tokenError;
-	token.start_ = begin_;
-	token.end_ = begin_;
-	ErrorInfo info;
-	info.token_ = token;
-	info.message_ = message;
-	errors_.push_back(info);
-	return true;
 }
 
 bool Reader::good() const {

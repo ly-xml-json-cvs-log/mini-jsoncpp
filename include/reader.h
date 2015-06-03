@@ -76,24 +76,6 @@ public:
 
 	std::vector<string> getStructuredErrors() const;
 
-	/** \brief Add a semantic error message.
-	 * \param value JSON Value location associated with the error
-	 * \param message The error message.
-	 * \return \c true if the error was successfully added, \c false if the
-	 * Value offset exceeds the document size.
-	 */
-	bool pushError(const Value& value, const std::string& message);
-
-	/** \brief Add a semantic error message with extra context.
-	 * \param value JSON Value location associated with the error
-	 * \param message The error message.
-	 * \param extra Additional JSON Value location to contextualize the error
-	 * \return \c true if the error was successfully added, \c false if either
-	 * Value offset exceeds the document size.
-	 */
-	bool pushError(const Value& value, const std::string& message,
-			const Value& extra);
-
 	/** \brief Return whether there are any errors.
 	 * \return \c true if there are no errors to report \c false if
 	 * errors have occurred.
@@ -142,8 +124,8 @@ private:
 	bool readString();
 	void readNumber();
 	bool readValue();
-	bool readObject(Token& token);
-	bool readArray(Token& token);
+	bool readObject();
+	bool readArray();
 	bool decodeNumber(Token& token);
 	bool decodeNumber(Token& token, Value& decoded);
 	bool decodeString(Token& token);
@@ -154,7 +136,7 @@ private:
 			unsigned int& unicode);
 	bool decodeUnicodeEscapeSequence(Token& token, Location& current,
 			Location end, unsigned int& unicode);
-	bool addError(const std::string& message, Token& token, Location extra = 0);
+	bool addError(const std::string& message, Token& token);
 	bool recoverFromError(TokenType skipUntilToken);
 	bool addErrorAndRecover(const std::string& message, Token& token,
 			TokenType skipUntilToken);
